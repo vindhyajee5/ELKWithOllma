@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: dummy-logger
+  namespace: ai-logs
+spec:
+  containers:
+    - name: logger
+      image: alpine
+      command: ["/bin/sh"]
+      args:
+        - -c
+        - |
+          apk add --no-cache netcat-openbsd
+          while true; do
+            ERRORS="NullPointerException at OrderService.java:45
+                    DatabaseTimeoutException at PaymentService.java:88
+                    IllegalArgumentException at UserService.java:23"
+            RANDOM_ERROR=$(echo "$ERRORS" | shuf -n1)
+            echo "{\"level\":\"ERROR\",\"message\":\"$RANDOM_ERROR\"}" | nc logstash 5000
+            sleep 15
+          done

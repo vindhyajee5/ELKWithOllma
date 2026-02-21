@@ -1,0 +1,42 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: ai-log-analyzer
+  namespace: ai-logs
+spec:
+  schedule: "*/2 * * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: analyzer
+              image: alpine
+              command: ["/bin/sh"]
+              args:
+                - -c
+                - |
+                  apk add --no-cache curl jq
+
+                  echo "Fetching latest ERROR log..."
+
+                  LOG=$(curl -s http://elasticsearch:9200/dummy-logs/_search \
+                    -H 'Content-Type: application/json' \
+                    -d '{
+                          "size":1,
+                          "sort":[{"@timestamp":"desc"}],
+                          "query":{"match":{"level":"ERROR"}}
+                        }' | jq -r '.hits.hits[0]._source.message')
+
+                  echo "Latest Log: $LOG"
+
+                  echo "Sending to Ollama on Windows..."
+
+                  curl -s http://host.docker.internal:11434/api/generate \
+                    -d "{
+                          \"model\":\"llama3\",
+                          \"prompt\":\"Analyze this production error and suggest root cause and fix: $LOG\",
+                          \"stream\":false
+                        }"
+
+          restartPolicy: OnFailure
